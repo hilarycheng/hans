@@ -25,6 +25,14 @@
 
 using namespace std;
 
+int now_s() {
+  struct timespec res;
+
+  clock_gettime(CLOCK_REALTIME, &res);
+
+  return res.tv_sec;
+}
+
 string Utility::formatIp(uint32_t ip)
 {
     char buffer[16];

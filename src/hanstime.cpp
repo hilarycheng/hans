@@ -17,7 +17,7 @@
  *
  */
 
-#include "time.h"
+#include "hanstime.h"
 
 const Time Time::ZERO = Time(0);
 

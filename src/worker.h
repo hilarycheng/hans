@@ -20,7 +20,7 @@
 #ifndef WORKER_H
 #define WORKER_H
 
-#include "time.h"
+#include "hanstime.h"
 #include "echo.h"
 #include "tun.h"
 

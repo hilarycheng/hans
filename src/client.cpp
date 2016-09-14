@@ -129,14 +129,17 @@ bool Client::handleEchoData(const TunnelHeader &header, int dataLength, uint32_t
 
                 syslog(LOG_INFO, "connection established");
 
+                // printf("%s %d\n", __PRETTY_FUNCTION__, __LINE__);
                 uint32_t ip = ntohl(*(uint32_t *)echoReceivePayloadBuffer());
                 if (ip != clientIp)
                 {
+                  // printf("%s %d\n", __PRETTY_FUNCTION__, __LINE__);
                     if (privilegesDropped)
                         throw Exception("could not get the same ip address, so root privileges are required to change it");
 
                     clientIp = ip;
                     desiredIp = ip;
+                    // printf("%s %d %08X %08X\n", __PRETTY_FUNCTION__, __LINE__, clientIp, desiredIp);
                     tun->setIp(ip, (ip & 0xffffff00) + 1, false);
                 }
                 state = STATE_ESTABLISHED;

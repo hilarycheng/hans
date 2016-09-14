@@ -34,6 +34,14 @@
 #include <w32api/windows.h>
 #endif
 
+#ifdef __ANDROID__
+#define IFCONFIG "/system/bin/ifconfig"
+#define ROUTE    "/system/bin/route"
+#else
+#define IFCONFIG "/sbin/ifconfig"
+#define ROUTE    "/sbin/route"
+#endif
+
 typedef ip IpHeader;
 
 using namespace std;
@@ -76,7 +84,7 @@ Tun::Tun(const char *device, int mtu)
     snprintf(cmdline, sizeof(cmdline), "netsh interface ipv4 set subinterface \"%s\" mtu=%d", this->device, mtu);
     winsystem(cmdline);
 #else
-    snprintf(cmdline, sizeof(cmdline), "/sbin/ifconfig %s mtu %u", this->device, mtu);
+    snprintf(cmdline, sizeof(cmdline), IFCONFIG " %s mtu %u", this->device, mtu);
     if (system(cmdline) != 0)
         syslog(LOG_ERR, "could not set tun device mtu");
 #endif
@@ -101,17 +109,33 @@ void Tun::setIp(uint32_t ip, uint32_t destIp, bool includeSubnet)
     if (!tun_set_ip(fd, ip, ip & 0xffffff00, 0xffffff00))
         syslog(LOG_ERR, "could not set tun device driver ip address: %s", tun_last_error());
 #elif LINUX
-    snprintf(cmdline, sizeof(cmdline), "/sbin/ifconfig %s %s netmask 255.255.255.0", device, ips.c_str());
+    snprintf(cmdline, sizeof(cmdline), IFCONFIG " %s %s netmask 255.255.255.0", device, ips.c_str());
+    printf("%s\n", ips.c_str());
     if (system(cmdline) != 0)
         syslog(LOG_ERR, "could not set tun device ip address");
+
+#ifdef __ANDROID__
+    snprintf(cmdline, sizeof(cmdline), "/system/bin/ip rule del table 101");
+    system(cmdline);
+
+    snprintf(cmdline, sizeof(cmdline), "/system/bin/ip route flush table 101");
+    system(cmdline);
+
+    snprintf(cmdline, sizeof(cmdline), "/system/bin/ip rule add prio 101 from all lookup 101");
+    system(cmdline);
+
+    snprintf(cmdline, sizeof(cmdline), "/system/bin/ip route add table 101 10.1.2.0/24 dev %s", device);
+    system(cmdline);
+#endif
+
 #else
-    snprintf(cmdline, sizeof(cmdline), "/sbin/ifconfig %s %s %s netmask 255.255.255.255", device, ips.c_str(), destIps.c_str());
+    snprintf(cmdline, sizeof(cmdline), IFCONFIG " %s %s %s netmask 255.255.255.255", device, ips.c_str(), destIps.c_str());
     if (system(cmdline) != 0)
         syslog(LOG_ERR, "could not set tun device ip address");
 
     if (includeSubnet)
     {
-        snprintf(cmdline, sizeof(cmdline), "/sbin/route add %s/24 %s", destIps.c_str(), destIps.c_str());
+        snprintf(cmdline, sizeof(cmdline), ROUTE " add %s/24 %s", destIps.c_str(), destIps.c_str());
         if (system(cmdline) != 0)
             syslog(LOG_ERR, "could not add route");
     }

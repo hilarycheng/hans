@@ -2,7 +2,7 @@ LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
 
-LOCAL_CFLAGS += -fPIE -I./src -fexceptions
+LOCAL_CFLAGS += -fPIE -I./src -fexceptions -DHAVE_LINUX_IF_TUN_H -D__ANDROID__ -DLINUX
 
 LOCAL_LDFLAGS += -fPIE -pie -llog
 

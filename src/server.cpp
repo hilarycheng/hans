@@ -70,7 +70,7 @@ void Server::handleUnknownClient(const TunnelHeader &header, int dataLength, uin
     client.state = ClientData::STATE_NEW;
     client.tunnelIp = reserveTunnelIp(connectData->desiredIp);
 
-    syslog(LOG_DEBUG, "new client: %s (%s)\n", Utility::formatIp(client.realIp).c_str(), Utility::formatIp(client.tunnelIp).c_str());
+    syslog(LOG_INFO, "new client: %s (%s)\n", Utility::formatIp(client.realIp).c_str(), Utility::formatIp(client.tunnelIp).c_str());
 
     if (client.tunnelIp != 0)
     {

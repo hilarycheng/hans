@@ -33,7 +33,7 @@ using namespace std;
 const Worker::TunnelHeader::Magic Server::magic("hans");
 
 Server::Server(int tunnelMtu, const char *deviceName, const char *passphrase, uint32_t network, bool answerEcho, uid_t uid, gid_t gid, int pollTimeout)
-    : Worker(tunnelMtu, deviceName, answerEcho, uid, gid), auth(passphrase)
+  : Worker(tunnelMtu, deviceName, answerEcho, uid, gid, 1), auth(passphrase)
 {
     this->network = network & 0xffffff00;
     this->pollTimeout = pollTimeout;
@@ -49,10 +49,11 @@ Server::~Server()
 
 }
 
-void Server::handleUnknownClient(const TunnelHeader &header, int dataLength, uint32_t realIp, uint16_t echoId, uint16_t echoSeq)
+void Server::handleUnknownClient(const TunnelHeader &header, int dataLength, uint32_t realIp, uint32_t realPort, uint16_t echoId, uint16_t echoSeq)
 {
     ClientData client;
     client.realIp = realIp;
+    client.realPort = realPort;
     client.maxPolls = 1;
 
     pollReceived(&client, echoId, echoSeq);
@@ -143,7 +144,7 @@ void Server::sendReset(ClientData *client)
     sendEchoToClient(client, TunnelHeader::TYPE_RESET_CONNECTION, 0);
 }
 
-bool Server::handleEchoData(const TunnelHeader &header, int dataLength, uint32_t realIp, bool reply, uint16_t id, uint16_t seq)
+bool Server::handleEchoData(const TunnelHeader &header, int dataLength, uint32_t realIp, uint32_t realPort, bool reply, uint16_t id, uint16_t seq)
 {
     if (reply)
         return false;
@@ -154,7 +155,7 @@ bool Server::handleEchoData(const TunnelHeader &header, int dataLength, uint32_t
     ClientData *client = getClientByRealIp(realIp);
     if (client == NULL)
     {
-        handleUnknownClient(header, dataLength, realIp, id, seq);
+      handleUnknownClient(header, dataLength, realIp, realPort, id, seq);
         return true;
     }
 
@@ -265,7 +266,7 @@ void Server::sendEchoToClient(ClientData *client, int type, int dataLength)
 {
     if (client->maxPolls == 0)
     {
-        sendEcho(magic, type, dataLength, client->realIp, true, client->pollIds.front().id, client->pollIds.front().seq);
+        sendEcho(magic, type, dataLength, client->realIp, client->realPort, true, client->pollIds.front().id, client->pollIds.front().seq);
         return;
     }
 
@@ -275,7 +276,7 @@ void Server::sendEchoToClient(ClientData *client, int type, int dataLength)
         client->pollIds.pop();
 
         DEBUG_ONLY(printf("sending -> %d\n", client->pollIds.size()));
-        sendEcho(magic, type, dataLength, client->realIp, true, echoId.id, echoId.seq);
+        sendEcho(magic, type, dataLength, client->realIp, client->realPort, true, echoId.id, echoId.seq);
         return;
     }
 

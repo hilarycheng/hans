@@ -16,7 +16,7 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <stdio.h>
 #include "worker.h"
 #include "tun.h"
 #include "exception.h"
@@ -46,7 +46,7 @@ bool Worker::TunnelHeader::Magic::operator!=(const Magic &other) const
     return memcmp(data, other.data, sizeof(data)) != 0;
 }
 
-Worker::Worker(int tunnelMtu, const char *deviceName, bool answerEcho, uid_t uid, gid_t gid)
+Worker::Worker(int tunnelMtu, const char *deviceName, bool answerEcho, uid_t uid, gid_t gid, int server)
 {
     this->tunnelMtu = tunnelMtu;
     this->answerEcho = answerEcho;
@@ -59,7 +59,7 @@ Worker::Worker(int tunnelMtu, const char *deviceName, bool answerEcho, uid_t uid
 
     try
     {
-        echo = new Echo(tunnelMtu + sizeof(TunnelHeader));
+        echo = new Echo(tunnelMtu + sizeof(TunnelHeader), server);
         tun = new Tun(deviceName, tunnelMtu);
     }
     catch (...)
@@ -77,7 +77,7 @@ Worker::~Worker()
     delete tun;
 }
 
-void Worker::sendEcho(const TunnelHeader::Magic &magic, int type, int length, uint32_t realIp, bool reply, uint16_t id, uint16_t seq)
+void Worker::sendEcho(const TunnelHeader::Magic &magic, int type, int length, uint32_t realIp, uint32_t realPort, bool reply, uint16_t id, uint16_t seq)
 {
     if (length > payloadBufferSize())
         throw Exception("packet too big");
@@ -88,7 +88,7 @@ void Worker::sendEcho(const TunnelHeader::Magic &magic, int type, int length, ui
 
     DEBUG_ONLY(printf("sending: type %d, length %d, id %d, seq %d\n", type, length, id, seq));
 
-    echo->send(length + sizeof(TunnelHeader), realIp, reply, id, seq);
+    echo->send(length + sizeof(TunnelHeader), realIp, realPort, reply, id, seq);
 }
 
 void Worker::sendToTun(int length)
@@ -149,25 +149,25 @@ void Worker::run()
             bool reply;
             uint16_t id, seq;
             uint32_t ip;
+            uint32_t port;
 
-            int dataLength = echo->receive(ip, reply, id, seq);
+            int dataLength = echo->receive(ip, port, reply, id, seq);
             if (dataLength != -1)
             {
                 bool valid = dataLength >= sizeof(TunnelHeader);
-
                 if (valid)
                 {
                     TunnelHeader *header = (TunnelHeader *)echo->receivePayloadBuffer();
 
                     DEBUG_ONLY(printf("received: type %d, length %d, id %d, seq %d\n", header->type, dataLength - sizeof(TunnelHeader), id, seq));
 
-                    valid = handleEchoData(*header, dataLength - sizeof(TunnelHeader), ip, reply, id, seq);
+                    valid = handleEchoData(*header, dataLength - sizeof(TunnelHeader), ip, port, reply, id, seq);
                 }
 
                 if (!valid && !reply && answerEcho)
                 {
                     memcpy(echo->sendPayloadBuffer(), echo->receivePayloadBuffer(), dataLength);
-                    echo->send(dataLength, ip, true, id, seq);
+                    echo->send(dataLength, ip, port, true, id, seq);
                 }
             }
         }

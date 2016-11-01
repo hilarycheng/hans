@@ -34,15 +34,31 @@
 
 typedef ip IpHeader;
 
-Echo::Echo(int maxPayloadSize)
+Echo::Echo(int maxPayloadSize, int server)
 {
-    fd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+    this->isServer = server;
+    fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (fd == -1)
-        throw Exception("creating icmp socket", true);
+        throw Exception("creating udp socket", true);
 
     bufferSize = maxPayloadSize + headerSize();
     sendBuffer = new char[bufferSize];
     receiveBuffer = new char[bufferSize];
+
+    if (this->isServer) {
+      struct sockaddr_in serveraddr;
+      int optval = 1;
+
+      optval = 1;
+      setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const void *) &optval, sizeof(int));
+      bzero((char *) &serveraddr, sizeof(serveraddr));
+      serveraddr.sin_family      = AF_INET;
+      serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
+      serveraddr.sin_port        = htons(1194);
+      if (bind(fd, (struct sockaddr *) &serveraddr, sizeof(serveraddr)) < 0) {
+        throw Exception("cannot bind socket", true);
+      }
+    }
 }
 
 Echo::~Echo()
@@ -55,32 +71,33 @@ Echo::~Echo()
 
 int Echo::headerSize()
 {
-    return sizeof(IpHeader) + sizeof(EchoHeader);
+    return sizeof(EchoHeader);
 }
 
-void Echo::send(int payloadLength, uint32_t realIp, bool reply, uint16_t id, uint16_t seq)
+void Echo::send(int payloadLength, uint32_t realIp, uint32_t realPort, bool reply, uint16_t id, uint16_t seq)
 {
     struct sockaddr_in target;
     target.sin_family = AF_INET;
     target.sin_addr.s_addr = htonl(realIp);
+    target.sin_port = htons(realPort);
 
-    if (payloadLength + sizeof(IpHeader) + sizeof(EchoHeader) > bufferSize)
+    if (payloadLength + sizeof(EchoHeader) > bufferSize)
         throw Exception("packet too big");
 
-    EchoHeader *header = (EchoHeader *)(sendBuffer + sizeof(IpHeader));
+    EchoHeader *header = (EchoHeader *)(sendBuffer);
     header->type = reply ? 0: 8;
     header->code = 0;
     header->id = htons(id);
     header->seq = htons(seq);
     header->chksum = 0;
-    header->chksum = icmpChecksum(sendBuffer + sizeof(IpHeader), payloadLength + sizeof(EchoHeader));
+    header->chksum = icmpChecksum(sendBuffer, payloadLength + sizeof(EchoHeader));
 
-    int result = sendto(fd, sendBuffer + sizeof(IpHeader), payloadLength + sizeof(EchoHeader), 0, (struct sockaddr *)&target, sizeof(struct sockaddr_in));
+    int result = sendto(fd, sendBuffer, payloadLength + sizeof(EchoHeader), 0, (struct sockaddr *)&target, sizeof(struct sockaddr_in));
     if (result == -1)
         syslog(LOG_ERR, "error sending icmp packet: %s", strerror(errno));
 }
 
-int Echo::receive(uint32_t &realIp, bool &reply, uint16_t &id, uint16_t &seq)
+int Echo::receive(uint32_t &realIp, uint32_t &realPort, bool &reply, uint16_t &id, uint16_t &seq)
 {
     struct sockaddr_in source;
     int source_addr_len = sizeof(struct sockaddr_in);
@@ -92,19 +109,20 @@ int Echo::receive(uint32_t &realIp, bool &reply, uint16_t &id, uint16_t &seq)
         return -1;
     }
 
-    if (dataLength < sizeof(IpHeader) + sizeof(EchoHeader))
+    if (dataLength < sizeof(EchoHeader))
         return -1;
 
-    EchoHeader *header = (EchoHeader *)(receiveBuffer + sizeof(IpHeader));
+    EchoHeader *header = (EchoHeader *)(receiveBuffer);
     if ((header->type != 0 && header->type != 8) || header->code != 0)
         return -1;
 
     realIp = ntohl(source.sin_addr.s_addr);
+    realPort = htons(source.sin_port);
     reply = header->type == 0;
     id = ntohs(header->id);
     seq = ntohs(header->seq);
 
-    return dataLength - sizeof(IpHeader) - sizeof(EchoHeader);
+    return dataLength - sizeof(EchoHeader);
 }
 
 uint16_t Echo::icmpChecksum(const char *data, int length)

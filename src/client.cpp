@@ -35,7 +35,7 @@ const Worker::TunnelHeader::Magic Client::magic("hanc");
 Client::Client(int tunnelMtu, const char *deviceName, uint32_t serverIp,
                int maxPolls, const char *passphrase, uid_t uid, gid_t gid,
                bool changeEchoId, bool changeEchoSeq, uint32_t desiredIp)
-: Worker(tunnelMtu, deviceName, false, uid, gid), auth(passphrase)
+ : Worker(tunnelMtu, deviceName, false, uid, gid, 0), auth(passphrase)
 {
     this->serverIp = serverIp;
     this->clientIp = INADDR_NONE;
@@ -89,7 +89,7 @@ void Client::sendChallengeResponse(int dataLength)
     setTimeout(5000);
 }
 
-bool Client::handleEchoData(const TunnelHeader &header, int dataLength, uint32_t realIp, bool reply, uint16_t id, uint16_t seq)
+bool Client::handleEchoData(const TunnelHeader &header, int dataLength, uint32_t realIp, uint32_t realPort, bool reply, uint16_t id, uint16_t seq)
 {
     if (realIp != serverIp || !reply)
         return false;
@@ -175,7 +175,7 @@ void Client::sendEchoToServer(int type, int dataLength)
     if (maxPolls == 0 && state == STATE_ESTABLISHED)
         setTimeout(KEEP_ALIVE_INTERVAL);
 
-    sendEcho(magic, type, dataLength, serverIp, false, nextEchoId, nextEchoSequence);
+    sendEcho(magic, type, dataLength, serverIp, 1194, false, nextEchoId, nextEchoSequence);
 
     if (changeEchoId)
         nextEchoId = nextEchoId + 38543; // some random prime

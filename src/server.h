@@ -69,6 +69,7 @@ protected:
         };
 
         uint32_t realIp;
+        uint32_t realPort;
         uint32_t tunnelIp;
 
         std::queue<Packet> pendingPackets;
@@ -85,7 +86,7 @@ protected:
     typedef std::vector<ClientData> ClientList;
     typedef std::map<uint32_t, int> ClientIpMap;
 
-    virtual bool handleEchoData(const TunnelHeader &header, int dataLength, uint32_t realIp, bool reply, uint16_t id, uint16_t seq);
+    virtual bool handleEchoData(const TunnelHeader &header, int dataLength, uint32_t realIp, uint32_t realPort, bool reply, uint16_t id, uint16_t seq);
     virtual void handleTunData(int dataLength, uint32_t sourceIp, uint32_t destIp);
     virtual void handleTimeout();
 
@@ -93,7 +94,7 @@ protected:
 
     void serveTun(ClientData *client);
 
-    void handleUnknownClient(const TunnelHeader &header, int dataLength, uint32_t realIp, uint16_t echoId, uint16_t echoSeq);
+    void handleUnknownClient(const TunnelHeader &header, int dataLength, uint32_t realIp, uint32_t realPort, uint16_t echoId, uint16_t echoSeq);
     void removeClient(ClientData *client);
 
     void sendChallenge(ClientData *client);

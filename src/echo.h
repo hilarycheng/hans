@@ -26,13 +26,13 @@
 class Echo
 {
 public:
-    Echo(int maxPayloadSize);
+    Echo(int maxPayloadSize, int server);
     ~Echo();
 
     int getFd() { return fd; }
 
-    void send(int payloadLength, uint32_t realIp, bool reply, uint16_t id, uint16_t seq);
-    int receive(uint32_t &realIp, bool &reply, uint16_t &id, uint16_t &seq);
+    void send(int payloadLength, uint32_t realIp, uint32_t realPort, bool reply, uint16_t id, uint16_t seq);
+    int receive(uint32_t &realIp, uint32_t &realPort, bool &reply, uint16_t &id, uint16_t &seq);
 
     char *sendPayloadBuffer() { return sendBuffer + headerSize(); }
     char *receivePayloadBuffer() { return receiveBuffer + headerSize(); }
@@ -52,6 +52,7 @@ protected:
 
     int fd;
     int bufferSize;
+    int isServer;
     char *sendBuffer, *receiveBuffer;
 };
 
